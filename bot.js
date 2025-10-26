@@ -705,18 +705,8 @@ async function showResult(ctx, chatId) {
   console.log(`   Total unique characters used: ${gameState.usedCharacters.length}`);
   console.log(`   Characters used: [${gameState.usedCharacters.join(', ')}]`);
   
-  // Build the story
+  // Build the story (skip individual choices, show only final result)
   let resultText = '🎉 ဂိမ်းပြီးဆုံးပါပြီ!\n\n';
-  resultText += '📝 ရလဒ်:\n\n';
-  
-  // Show all choices
-  for (let i = 0; i < gameState.questions.length; i++) {
-    const answerData = gameState.answers[i];
-    resultText += `${answerData.question}\n`;
-    resultText += `👤 ${answerData.player.name}: ${answerData.answer}\n\n`;
-  }
-  
-  // Build final sentence
   resultText += '📖 Results:\n\n';
   
   const parts = [];
