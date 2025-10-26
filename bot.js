@@ -769,11 +769,86 @@ bot.catch((err) => {
   console.error('   Stack trace:', err.stack);
 });
 
+// Health check endpoint for Koyeb
+const http = require('http');
+const PORT = process.env.PORT || 3000;
+
+const healthCheckServer = http.createServer((req, res) => {
+  if (req.url === '/health' || req.url === '/') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({
+      status: 'ok',
+      bot: 'running',
+      uptime: process.uptime(),
+      activeGames: gameStates.size,
+      timestamp: new Date().toISOString()
+    }));
+  } else {
+    res.writeHead(404, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Not found' }));
+  }
+});
+
+healthCheckServer.listen(PORT, () => {
+  console.log(`\n🏥 Health check server listening on port ${PORT}`);
+  console.log(`   Health endpoint: http://localhost:${PORT}/health`);
+});
+
+// Graceful shutdown handler
+function gracefulShutdown(signal) {
+  console.log(`\n⚠️  Received ${signal}, shutting down gracefully...`);
+  console.log('🛑 Stopping bot...');
+  
+  // Stop accepting new requests
+  healthCheckServer.close(() => {
+    console.log('🏥 Health check server stopped');
+  });
+  
+  // Stop bot
+  bot.stop(signal).then(() => {
+    console.log('✅ Bot stopped successfully');
+    console.log('👋 Goodbye!\n');
+    process.exit(0);
+  }).catch((err) => {
+    console.error('❌ Error during shutdown:', err.message);
+    process.exit(1);
+  });
+  
+  // Force exit after 30 seconds if graceful shutdown fails
+  setTimeout(() => {
+    console.error('⚠️  Forced shutdown after timeout');
+    process.exit(1);
+  }, 30000);
+}
+
+// Handle process termination signals (Koyeb uses these)
+process.once('SIGINT', () => gracefulShutdown('SIGINT'));
+process.once('SIGTERM', () => gracefulShutdown('SIGTERM'));
+
+// Handle uncaught errors
+process.on('uncaughtException', (err) => {
+  console.error('\n💥 UNCAUGHT EXCEPTION:');
+  console.error('   Error:', err.message);
+  console.error('   Stack:', err.stack);
+  console.error('   Bot will attempt to continue...\n');
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('\n⚠️  UNHANDLED REJECTION:');
+  console.error('   Reason:', reason);
+  console.error('   Promise:', promise);
+  console.error('   Bot will attempt to continue...\n');
+});
+
 // Start bot
 console.log('\n🤖 Initializing bot...');
+console.log('🌍 Environment:', process.env.NODE_ENV || 'development');
+console.log('📦 Node version:', process.version);
+
 bot.start().then(() => {
   console.log('✅ Bot is running successfully!');
-  console.log('📱 Waiting for messages...\n');
+  console.log('📱 Waiting for messages...');
+  console.log('🔄 Press Ctrl+C to stop gracefully\n');
 }).catch((err) => {
   console.error('\n❌ Failed to start bot:');
   console.error('   Error:', err.message);

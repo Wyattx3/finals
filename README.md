@@ -39,6 +39,8 @@ BOT_TOKEN=your_bot_token_here
 
 ## Running the Bot
 
+### Local Development
+
 ```bash
 npm start
 ```
@@ -48,6 +50,28 @@ npm start
 ```bash
 node bot.js
 ```
+
+### Production Deployment (Koyeb)
+
+Bot က production-ready ဖြစ်ပြီး Koyeb မှာ deploy လုပ်နိုင်ပါပြီ:
+
+- ✅ Graceful shutdown handling (SIGTERM/SIGINT)
+- ✅ Health check endpoint (`/health`)
+- ✅ Error recovery (uncaught exceptions, unhandled rejections)
+- ✅ Auto-restart on failures
+- ✅ Process monitoring and logging
+
+**Koyeb မှာ deploy လုပ်ဖို့:**
+
+အသေးစိတ် instructions အတွက် [DEPLOYMENT.md](DEPLOYMENT.md) ကို ဖတ်ပါ။
+
+Quick steps:
+1. Koyeb account ဖွင့်ပါ
+2. GitHub repository connect လုပ်ပါ
+3. Environment variable `BOT_TOKEN` ထည့်ပါ
+4. Deploy button နှိပ်ပါ!
+
+Bot က 24/7 run နေမှာပါ! 🚀
 
 ## How to Use
 
