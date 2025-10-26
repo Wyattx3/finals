@@ -7,11 +7,12 @@ console.log('📝 Bot Token:', process.env.BOT_TOKEN ? '✅ Found' : '❌ Not fo
 const bot = new Bot(process.env.BOT_TOKEN);
 
 // Rate limit configuration (to avoid Telegram API limits)
+// Increased delays to prevent 429 "Too Many Requests" errors
 const RATE_LIMITS = {
   COUNTDOWN_INTERVAL: 2000,        // 2 seconds (instead of 1s to reduce edit frequency)
-  QUESTION_DELAY: 2500,            // 2.5 seconds between questions
-  GAME_START_DELAY: 3000,          // 3 seconds before starting game
-  ANSWER_TO_NEXT_QUESTION: 2000,   // 2 seconds after answer before next question
+  QUESTION_DELAY: 4000,            // 4 seconds between questions (increased from 2.5s)
+  GAME_START_DELAY: 4000,          // 4 seconds before starting game (increased from 3s)
+  ANSWER_TO_NEXT_QUESTION: 3000,   // 3 seconds after answer before next question (increased from 2s)
   CALLBACK_RESPONSE_DELAY: 100,    // Small delay for callback responses
   MESSAGE_EDIT_DELAY: 500          // Delay between message edits
 };
