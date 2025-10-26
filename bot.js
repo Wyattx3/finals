@@ -1,8 +1,11 @@
 require('dotenv').config();
 const { Bot, InlineKeyboard, session } = require('grammy');
+const { initializeDatabase, closeDatabase } = require('./database');
+const gameStates = require('./game-state-manager');
 
 console.log('🚀 Starting Telegram Story Game Bot...');
 console.log('📝 Bot Token:', process.env.BOT_TOKEN ? '✅ Found' : '❌ Not found');
+console.log('📝 Database URL:', process.env.DATABASE_URL ? '✅ Found' : '❌ Not found');
 
 const bot = new Bot(process.env.BOT_TOKEN);
 
@@ -168,8 +171,8 @@ const OPTIONS = {
   ]
 };
 
-// Game states stored per chat
-const gameStates = new Map();
+// Note: Game states now stored in PostgreSQL database (see database.js)
+// No more in-memory Map - all state is persistent!
 
 // Get questions based on player count
 function getQuestions(playerCount) {
@@ -303,10 +306,10 @@ async function startGameLobby(ctx) {
   
   console.log(`\n🎮 Starting game lobby`);
   console.log(`   Chat ID: ${chatId}`);
-  console.log(`   Active games: ${gameStates.size}`);
+  console.log(`   Active games: ${await gameStates.size()}`);
   
   // Check if game already running
-  if (gameStates.has(chatId)) {
+  if (await gameStates.has(chatId)) {
     console.log(`   ⚠️  Game already exists in this chat`);
     await ctx.reply('⚠️ ဒီ chat မှာ game တခု ရှိနေပါပြီ!');
     return;
@@ -326,7 +329,7 @@ async function startGameLobby(ctx) {
     usedOptions: {}          // Track used options per question type
   };
   
-  gameStates.set(chatId, gameState);
+  await gameStates.set(chatId, gameState);
   console.log(`   ✅ Game lobby created`);
   
   const keyboard = new InlineKeyboard()
@@ -371,7 +374,7 @@ async function startGameLobby(ctx) {
           message.message_id,
           '❌ လူအရေအတွက် မလောက်လို့ game မစနိုင်ပါ။ (အနည်းဆုံး 4 ယောက် လိုအပ်ပါတယ်)'
         );
-        gameStates.delete(chatId);
+        await gameStates.delete(chatId);
       }
     } else {
       // Update countdown with rate limiting
@@ -407,7 +410,7 @@ async function startGameLobby(ctx) {
 // Handle join game
 bot.callbackQuery('join_game', async (ctx) => {
   const chatId = ctx.chat.id;
-  const gameState = gameStates.get(chatId);
+  const gameState = await gameStates.get(chatId);
   
   console.log(`\n🔘 Callback: join_game`);
   console.log(`   Chat ID: ${chatId}`);
@@ -487,7 +490,7 @@ bot.callbackQuery('join_game', async (ctx) => {
 
 // Start the actual game
 async function startGame(ctx, chatId) {
-  const gameState = gameStates.get(chatId);
+  const gameState = await gameStates.get(chatId);
   gameState.gameStarted = true;
   
   console.log(`\n🚀 Starting actual game`);
@@ -496,7 +499,7 @@ async function startGame(ctx, chatId) {
   console.log(`   Player list (join order): ${gameState.players.map(p => p.name).join(', ')}`);
   
   // Shuffle players to randomize question order (not based on join order)
-  gameState.players = gameState.players.sort(() => 0.5 - Math.random());
+  gameState.players = await gameStates.shufflePlayers(chatId);
   console.log(`   🔀 Shuffled order: ${gameState.players.map(p => p.name).join(', ')}`);
   
   // Get questions based on player count
@@ -525,7 +528,7 @@ async function startGame(ctx, chatId) {
 
 // Ask question to players
 async function askQuestion(ctx, chatId) {
-  const gameState = gameStates.get(chatId);
+  const gameState = await gameStates.get(chatId);
   
   console.log(`\n❓ Asking question`);
   console.log(`   Question index: ${gameState.currentQuestionIndex + 1}/${gameState.questions.length}`);
@@ -591,7 +594,7 @@ async function askQuestion(ctx, chatId) {
 // Handle answer selection
 bot.callbackQuery(/answer_(\d+)_(\d+)/, async (ctx) => {
   const chatId = ctx.chat.id;
-  const gameState = gameStates.get(chatId);
+  const gameState = await gameStates.get(chatId);
   
   console.log(`\n🔘 Callback: answer selection`);
   console.log(`   Chat ID: ${chatId}`);
@@ -650,21 +653,22 @@ bot.callbackQuery(/answer_(\d+)_(\d+)/, async (ctx) => {
   answerData.answer = selectedAnswer;
   console.log(`   ✅ Answer selected: ${selectedAnswer}`);
   
-  // Track used characters and options to avoid duplicates
+  // Track used characters and options to avoid duplicates (in database)
   if (isCharacterQuestion(answerData.question)) {
     if (!gameState.usedCharacters.includes(selectedAnswer)) {
-      gameState.usedCharacters.push(selectedAnswer);
+      await gameStates.trackCharacter(chatId, selectedAnswer);
       console.log(`   📌 Added to used characters: ${selectedAnswer}`);
     }
   } else {
-    if (!gameState.usedOptions[answerData.question]) {
-      gameState.usedOptions[answerData.question] = [];
-    }
-    if (!gameState.usedOptions[answerData.question].includes(selectedAnswer)) {
-      gameState.usedOptions[answerData.question].push(selectedAnswer);
+    const questionOptions = gameState.usedOptions[answerData.question] || [];
+    if (!questionOptions.includes(selectedAnswer)) {
+      await gameStates.trackOption(chatId, answerData.question, selectedAnswer);
       console.log(`   📌 Added to used options for "${answerData.question}": ${selectedAnswer}`);
     }
   }
+  
+  // Save answer to database
+  await gameStates.saveAnswer(chatId, answerData.questionIndex, answerData.question, currentPlayer.id, selectedAnswer);
   
   // Add delay before callback response
   await new Promise(resolve => setTimeout(resolve, RATE_LIMITS.CALLBACK_RESPONSE_DELAY));
@@ -693,7 +697,7 @@ bot.callbackQuery(/answer_(\d+)_(\d+)/, async (ctx) => {
 
 // Show final result
 async function showResult(ctx, chatId) {
-  const gameState = gameStates.get(chatId);
+  const gameState = await gameStates.get(chatId);
   
   console.log(`\n🎉 Showing final result`);
   console.log(`   Chat ID: ${chatId}`);
@@ -756,9 +760,9 @@ async function showResult(ctx, chatId) {
   
   await ctx.api.sendMessage(chatId, resultText);
   
-  // Clean up game state
-  gameStates.delete(chatId);
-  console.log(`   ✅ Game cleaned up. Active games: ${gameStates.size}`);
+  // Clean up game state (delete from database)
+  await gameStates.delete(chatId);
+  console.log(`   ✅ Game cleaned up. Active games: ${await gameStates.size()}`);
 }
 
 // Error handling
@@ -773,14 +777,14 @@ bot.catch((err) => {
 const http = require('http');
 const PORT = process.env.PORT || 3000;
 
-const healthCheckServer = http.createServer((req, res) => {
+const healthCheckServer = http.createServer(async (req, res) => {
   if (req.url === '/health' || req.url === '/') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({
       status: 'ok',
       bot: 'running',
       uptime: process.uptime(),
-      activeGames: gameStates.size,
+      activeGames: await gameStates.size(),
       timestamp: new Date().toISOString()
     }));
   } else {
@@ -795,24 +799,29 @@ healthCheckServer.listen(PORT, () => {
 });
 
 // Graceful shutdown handler
-function gracefulShutdown(signal) {
+async function gracefulShutdown(signal) {
   console.log(`\n⚠️  Received ${signal}, shutting down gracefully...`);
   console.log('🛑 Stopping bot...');
   
-  // Stop accepting new requests
-  healthCheckServer.close(() => {
-    console.log('🏥 Health check server stopped');
-  });
-  
-  // Stop bot
-  bot.stop(signal).then(() => {
+  try {
+    // Stop accepting new requests
+    healthCheckServer.close(() => {
+      console.log('🏥 Health check server stopped');
+    });
+    
+    // Stop bot
+    await bot.stop(signal);
     console.log('✅ Bot stopped successfully');
+    
+    // Close database connections
+    await closeDatabase();
+    
     console.log('👋 Goodbye!\n');
     process.exit(0);
-  }).catch((err) => {
+  } catch (err) {
     console.error('❌ Error during shutdown:', err.message);
     process.exit(1);
-  });
+  }
   
   // Force exit after 30 seconds if graceful shutdown fails
   setTimeout(() => {
@@ -840,22 +849,32 @@ process.on('unhandledRejection', (reason, promise) => {
   console.error('   Bot will attempt to continue...\n');
 });
 
-// Start bot
+// Start bot with database
 console.log('\n🤖 Initializing bot...');
 console.log('🌍 Environment:', process.env.NODE_ENV || 'development');
 console.log('📦 Node version:', process.version);
 
-bot.start().then(() => {
-  console.log('✅ Bot is running successfully!');
-  console.log('📱 Waiting for messages...');
-  console.log('🔄 Press Ctrl+C to stop gracefully\n');
-}).catch((err) => {
-  console.error('\n❌ Failed to start bot:');
-  console.error('   Error:', err.message);
-  console.error('\n💡 Please check:');
-  console.error('   1. BOT_TOKEN is set correctly in .env file');
-  console.error('   2. Token is valid (get from @BotFather)');
-  console.error('   3. Internet connection is working\n');
-  process.exit(1);
-});
+async function startBot() {
+  try {
+    // Initialize database first
+    await initializeDatabase();
+    
+    // Then start bot
+    await bot.start();
+    console.log('✅ Bot is running successfully!');
+    console.log('📱 Waiting for messages...');
+    console.log('🔄 Press Ctrl+C to stop gracefully\n');
+  } catch (err) {
+    console.error('\n❌ Failed to start bot:');
+    console.error('   Error:', err.message);
+    console.error('\n💡 Please check:');
+    console.error('   1. BOT_TOKEN is set correctly in .env file');
+    console.error('   2. Token is valid (get from @BotFather)');
+    console.error('   3. Database URL is correct');
+    console.error('   4. Internet connection is working\n');
+    process.exit(1);
+  }
+}
+
+startBot();
 

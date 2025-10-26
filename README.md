@@ -15,6 +15,8 @@
 - 📱 **Button text optimization** - ရှည်တဲ့ text တွေကို button မှာ auto-truncate လုပ်ပြီး readable ဖြစ်အောင် ပြပါတယ်
 - 🔔 **Player mention system** - Player ရဲ့ turn ရောက်ရင် username mention လုပ်ပြီး notification ပို့ပေးပါတယ်
 - 🔀 **Random turn order** - Game စတဲ့အခါ player order ကို shuffle လုပ်ပြီး lobby join order နဲ့ မတူအောင် လုပ်ပါတယ်
+- 🗄️ **PostgreSQL Database** - Game states တွေကို persistent storage မှာ သိမ်းထားပြီး bot restart ဖြစ်လည်း games မပျောက်ပါဘူး
+- 🔄 **Automatic recovery** - Server restart/crash ဖြစ်လည်း games ကို ဆက်လက် ကစားနိုင်ပါတယ်
 
 ## Installation
 
@@ -25,10 +27,13 @@
 npm install
 ```
 
-3. `.env` file တခု create လုပ်ပြီး bot token ထည့်ပါ:
+3. `.env` file တခု create လုပ်ပြီး bot token နဲ့ database URL ထည့်ပါ:
 ```
 BOT_TOKEN=your_bot_token_here
+DATABASE_URL=your_postgresql_connection_string
 ```
+
+**PostgreSQL Database:** Bot က [Neon](https://neon.tech) PostgreSQL database သုံးထားပါတယ်။ Game states တွေကို persistent storage မှာ သိမ်းထားလို့ bot restart ဖြစ်လည်း games မပျောက်ပါဘူး။
 
 ## Getting Bot Token
 

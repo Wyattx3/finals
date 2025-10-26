@@ -29,10 +29,13 @@
 
 ```
 BOT_TOKEN=your_actual_bot_token_from_botfather
+DATABASE_URL=your_postgresql_connection_string
 NODE_ENV=production
 ```
 
-⚠️ **အရေးကြီးပါတယ်:** `BOT_TOKEN` ကို သင့်ရဲ့ တကယ့် bot token နဲ့ အစားထိုးပါ!
+⚠️ **အရေးကြီးပါတယ်:**
+- `BOT_TOKEN` ကို သင့်ရဲ့ တကယ့် bot token နဲ့ အစားထိုးပါ!
+- `DATABASE_URL` ကို သင့်ရဲ့ PostgreSQL connection string နဲ့ အစားထိုးပါ (Neon/Supabase/etc)
 
 ### 4. Service Configuration
 
