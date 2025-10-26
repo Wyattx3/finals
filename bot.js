@@ -717,7 +717,7 @@ async function showResult(ctx, chatId) {
   }
   
   // Build final sentence
-  resultText += '📖 စကားပုံ:\n\n';
+  resultText += '📖 Results:\n\n';
   
   const parts = [];
   for (let i = 0; i < gameState.questions.length; i++) {
