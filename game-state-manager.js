@@ -175,6 +175,27 @@ class GameStateManager {
     }
   }
   
+  // Add player to game
+  async addPlayer(chatId, userId, username) {
+    const state = await this.get(chatId);
+    if (state) {
+      const joinOrder = state.players.length;
+      await db.addPlayer(state._dbId, userId, username, joinOrder);
+      
+      // Update local state
+      state.players.push({
+        id: userId,
+        name: username,
+        joinOrder: joinOrder,
+        turnOrder: joinOrder
+      });
+      
+      this.cache.set(chatId, state);
+      return state.players.length;
+    }
+    return 0;
+  }
+  
   // Shuffle players
   async shufflePlayers(chatId) {
     const state = await this.get(chatId);

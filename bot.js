@@ -176,14 +176,22 @@ const OPTIONS = {
 
 // Get questions based on player count
 function getQuestions(playerCount) {
+  // Build questions array based on exact player count
+  // 4 players: ဘယ်သူက, ဘယ်သူ့ကို, ဘာအကြောင်း, ဘယ်လိုပြော
+  // 5 players: ဘယ်သူက, ဘယ်သူ့ကို, ဘယ်နေရာမှာ, ဘာအကြောင်း, ဘယ်လိုပြော
+  // 6 players: ဘယ်သူက, ဘယ်သူ့ကို, ဘယ်အချိန်, ဘယ်နေရာမှာ, ဘာအကြောင်း, ဘယ်လိုပြော
+  // 7 players: ဘယ်သူက, ဘယ်သူ့ကို, ဘယ်အချိန်, ဘယ်နေရာမှာ, ဘယ်သူ့ရဲ့, ဘာအကြောင်း, ဘယ်လိုပြော
+  // 8 players: ဘယ်သူက, ဘယ်သူ့ကို, ဘယ်အချိန်, ဘယ်နေရာမှာ, ဘယ်သူ့ရဲ့, ဘာအကြောင်း, ဘာလုပ်ပြီး, ဘယ်လိုပြော
+  
   const questions = ['ဘယ်သူက', 'ဘယ်သူ့ကို'];
   
+  // Add questions in order based on player count
   if (playerCount >= 6) questions.push('ဘယ်အချိန်');
   if (playerCount >= 5) questions.push('ဘယ်နေရာမှာ');
   if (playerCount >= 7) questions.push('ဘယ်သူ့ရဲ့');
-  if (playerCount >= 4) questions.push('ဘာအကြောင်း');
+  questions.push('ဘာအကြောင်း'); // Always included for 4+ players
   if (playerCount >= 8) questions.push('ဘာလုပ်ပြီး');
-  questions.push('ဘယ်လိုပြော');
+  questions.push('ဘယ်လိုပြော'); // Always last
   
   return questions;
 }
@@ -451,9 +459,13 @@ bot.callbackQuery('join_game', async (ctx) => {
     return;
   }
   
-  // Add player
-  gameState.players.push({ id: userId, name: userName });
-  console.log(`   ✅ Player joined! Total players: ${gameState.players.length}/8`);
+  // Add player (save to database)
+  const playerCount = await gameStates.addPlayer(chatId, userId, userName);
+  console.log(`   ✅ Player joined! Total players: ${playerCount}/8`);
+  
+  // Refresh game state from database
+  const updatedGameState = await gameStates.get(chatId);
+  Object.assign(gameState, updatedGameState);
   
   // Add delay before callback response
   await new Promise(resolve => setTimeout(resolve, RATE_LIMITS.CALLBACK_RESPONSE_DELAY));
@@ -499,7 +511,8 @@ async function startGame(ctx, chatId) {
   console.log(`   Player list (join order): ${gameState.players.map(p => p.name).join(', ')}`);
   
   // Shuffle players to randomize question order (not based on join order)
-  gameState.players = await gameStates.shufflePlayers(chatId);
+  const shuffledPlayers = await gameStates.shufflePlayers(chatId);
+  gameState.players = shuffledPlayers;
   console.log(`   🔀 Shuffled order: ${gameState.players.map(p => p.name).join(', ')}`);
   
   // Get questions based on player count
@@ -508,6 +521,10 @@ async function startGame(ctx, chatId) {
   gameState.answers = {};
   
   console.log(`   Questions: ${gameState.questions.join(', ')}`);
+  
+  // Save updated game state with shuffled players and questions to database
+  await gameStates.set(chatId, gameState);
+  console.log(`   💾 Game state saved to database`);
   
   // Add delay before editing message
   await new Promise(resolve => setTimeout(resolve, RATE_LIMITS.MESSAGE_EDIT_DELAY));
