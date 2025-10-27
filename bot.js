@@ -632,8 +632,11 @@ bot.callbackQuery(/answer_(\d+)_(\d+)/, async (ctx) => {
   const answerData = gameState.answers[questionIndex];
   
   // Check if it's the correct player's turn
-  if (ctx.from.id !== answerData.player.id) {
-    console.log(`   ⚠️  Wrong player! Expected: ${answerData.player.name}`);
+  // Use == instead of === for type-safe comparison (DB returns string, Telegram sends number)
+  if (ctx.from.id != answerData.player.id) {
+    console.log(`   ⚠️  Wrong player! Expected: ${answerData.player.name} (ID: ${answerData.player.id})`);
+    console.log(`   Current user: ${ctx.from.first_name} (ID: ${ctx.from.id}, Type: ${typeof ctx.from.id})`);
+    console.log(`   Expected ID type: ${typeof answerData.player.id}`);
     await new Promise(resolve => setTimeout(resolve, RATE_LIMITS.CALLBACK_RESPONSE_DELAY));
     await ctx.answerCallbackQuery({ 
       text: `⚠️ ${answerData.player.name} က ရွေးရမှာပါ!`, 
