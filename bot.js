@@ -648,7 +648,7 @@ async function askQuestion(ctx, chatId) {
   
   console.log(`   ✅ Question sent successfully`);
   
-  // Store options for this question
+  // Store options for this question (in cache only - database doesn't support this structure yet)
   gameState.answers[gameState.currentQuestionIndex] = {
     question: currentQuestion,
     options: options,
@@ -656,6 +656,10 @@ async function askQuestion(ctx, chatId) {
     answer: null,
     messageId: message.message_id
   };
+  
+  // Update cache directly (don't save to database - answers structure not in schema)
+  await gameStates.updateCache(chatId, gameState);
+  console.log(`   💾 Question data saved to cache`);
 }
 
 // Handle answer selection
@@ -678,6 +682,15 @@ bot.callbackQuery(/answer_(\d+)_(\d+)/, async (ctx) => {
   const optionIndex = parseInt(ctx.match[2]);
   
   console.log(`   Question index: ${questionIndex}, Option index: ${optionIndex}`);
+  
+  // Verify answers structure exists
+  if (!gameState.answers || !gameState.answers[questionIndex]) {
+    console.log(`   ⚠️  Answer data not found for question ${questionIndex}`);
+    console.log(`   Available answers: ${Object.keys(gameState.answers || {}).join(', ')}`);
+    await new Promise(resolve => setTimeout(resolve, RATE_LIMITS.CALLBACK_RESPONSE_DELAY));
+    await ctx.answerCallbackQuery({ text: '⚠️ Game data မရှိပါ! ထပ်စမ်းကြည့်ပါ', show_alert: true });
+    return;
+  }
   
   const answerData = gameState.answers[questionIndex];
   

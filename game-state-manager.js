@@ -50,10 +50,14 @@ class GameStateManager {
       gameStarted: game.game_started,
       questions: [], // Will be set when game starts
       currentQuestionIndex: game.current_question_index,
-      answers: answersObj,
+      answers: answersObj || {}, // Initialize as empty object if no answers yet
       usedCharacters: usedCharacters,
       usedOptions: usedOptions
     };
+    
+    // Note: answers object may be incomplete when retrieved from DB
+    // (options, player, messageId not stored in DB schema yet)
+    // These fields are maintained in cache only
     
     return state;
   }
@@ -214,6 +218,12 @@ class GameStateManager {
       return state.players;
     }
     return [];
+  }
+  
+  // Update cache only (for transient data that doesn't need database persistence)
+  async updateCache(chatId, gameState) {
+    this.cache.set(chatId, gameState);
+    return gameState;
   }
   
   // Clear cache (for memory management)
